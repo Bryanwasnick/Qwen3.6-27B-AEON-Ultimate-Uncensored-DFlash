@@ -6,7 +6,7 @@
 
 [![BF16](https://img.shields.io/badge/HuggingFace-BF16_(51_GB)-yellow?logo=huggingface)](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored)
 [![NVFP4](https://img.shields.io/badge/HuggingFace-NVFP4_(26_GB)-yellow?logo=huggingface)](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4)
-[![Container](https://img.shields.io/badge/ghcr.io-vllm--aeon--ultimate-blue?logo=docker)](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored/pkgs/container/vllm-aeon-ultimate)
+[![Container](https://img.shields.io/badge/ghcr.io-vllm--aeon--ultimate--dflash-blue?logo=docker)](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/pkgs/container/vllm-aeon-ultimate-dflash)
 [![License](https://img.shields.io/badge/License-Apache_2.0-green)](LICENSE)
 
 **Refusals: 0 / 100** &nbsp;·&nbsp; **KL vs base: 0.000492** &nbsp;·&nbsp; **Compression: 49 %** &nbsp;·&nbsp; **Capability: enhanced**
@@ -107,7 +107,7 @@ The empirically observed "capability damage threshold" in the abliteration liter
 
 | Hardware | Recommended release | Notes |
 |---|---|---|
-| **DGX Spark (GB10, sm_121a)** | **NVFP4** | Native FP4 tensor cores. Use the [`vllm-aeon-ultimate:qwen36-v2.1`](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored/pkgs/container/vllm-aeon-ultimate) container — production-tuned for this exact model + DFlash spec decode. |
+| **DGX Spark (GB10, sm_121a)** | **NVFP4** | Native FP4 tensor cores. Use the [`vllm-aeon-ultimate-dflash:qwen36-v2.1`](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/pkgs/container/vllm-aeon-ultimate-dflash) container — production-tuned for this exact model + DFlash spec decode. |
 | **B100 / B200 (sm_100)** | **NVFP4** | Native FP4 via `tcgen05` / UTCQMMA — fastest hardware for this format. |
 | **RTX PRO 6000 Blackwell (sm_120)** | **NVFP4** | Native FP4 via CUTLASS path. Excellent throughput. |
 | **H100 80 GB (sm_90)** | **BF16** | NVFP4 dequants to BF16 at kernel level — works but no throughput gain. Use BF16 for cleaner code path. |
@@ -119,7 +119,7 @@ The empirically observed "capability damage threshold" in the abliteration liter
 
 ## QuickStart — DGX Spark (NVFP4)
 
-The recommended path for Blackwell-class hardware. Uses the production v2.1 image [`ghcr.io/aeon-7/vllm-aeon-ultimate:qwen36-v2.1`](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored/pkgs/container/vllm-aeon-ultimate) — patched CUTLASS NVFP4 kernels for sm_121a, FlashInfer 0.6.9rc1 b12x backend, DFlash speculative decoding via architecture-matched drafter, and the full v1.2 → v2.1 upstream patch series.
+The recommended path for Blackwell-class hardware. Uses the production v2.1 image [`ghcr.io/aeon-7/vllm-aeon-ultimate-dflash:qwen36-v2.1`](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/pkgs/container/vllm-aeon-ultimate-dflash) — patched CUTLASS NVFP4 kernels for sm_121a, FlashInfer 0.6.9rc1 b12x backend, DFlash speculative decoding via architecture-matched drafter, and the full v1.2 → v2.1 upstream patch series.
 
 ### Step 1 — Authenticate to HuggingFace and pull both models
 
@@ -139,7 +139,7 @@ hf download z-lab/Qwen3.6-27B-DFlash \
 
 The production [`docker-compose.yml`](docker-compose.yml) in this repo is exactly the config used to measure the benchmarks below. Highlights:
 
-- **Image**: `ghcr.io/aeon-7/vllm-aeon-ultimate:qwen36-v2.1`
+- **Image**: `ghcr.io/aeon-7/vllm-aeon-ultimate-dflash:qwen36-v2.1`
 - **Speculative decoding**: DFlash, k=15, architecture-matched drafter (`--speculative-config`)
 - **GB10-specific env**: `TORCH_CUDA_ARCH_LIST=12.1a`, `ENABLE_NVFP4_SM100=0`, `VLLM_USE_FLASHINFER_SAMPLER=1`, `NVIDIA_FORWARD_COMPAT=1`
 - **Tuning**: `--max-model-len 200000 --max-num-seqs 16 --max-num-batched-tokens 32768 --gpu-memory-utilization 0.85`
@@ -364,7 +364,7 @@ Typical KL divergence vs the BF16 source for recipe-class NVFP4 quantization is 
 On Blackwell-class silicon, NVFP4 runs at **full FP4 tensor-core throughput** through native paths:
 
 - **B100 / B200**: `tcgen05` / UTCQMMA instructions — fastest NVFP4 hardware available.
-- **DGX Spark (GB10 / sm_121a)**: SM121-specific CUTLASS NVFP4 kernels (the [`vllm-aeon-ultimate`](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored/pkgs/container/vllm-aeon-ultimate) container ships these patched in).
+- **DGX Spark (GB10 / sm_121a)**: SM121-specific CUTLASS NVFP4 kernels (the [`vllm-aeon-ultimate-dflash`](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/pkgs/container/vllm-aeon-ultimate-dflash) container ships these patched in).
 - **RTX PRO 6000 Blackwell (sm_120)**: standard CUTLASS NVFP4 path.
 
 The GPU does **not** dequantize back to BF16 internally on these paths. You get the speed of true 4-bit compute *and* the accuracy of 16-bit weights at the same time.
@@ -435,7 +435,7 @@ Wielding an uncensored model is genuinely different from wielding an aligned one
 
 ### DGX Spark (GB10 / sm_121a) — measured
 
-Production config: `ghcr.io/aeon-7/vllm-aeon-ultimate:qwen36-v2.1`, DFlash spec-decode k=15 via `z-lab/Qwen3.6-27B-DFlash`, `--max-model-len 200000`, `--max-num-seqs 16`, `--gpu-memory-utilization 0.85`. Single-stream, greedy (`temperature=0`), reasoning mode disabled for clean decode-rate measurement.
+Production config: `ghcr.io/aeon-7/vllm-aeon-ultimate-dflash:qwen36-v2.1`, DFlash spec-decode k=15 via `z-lab/Qwen3.6-27B-DFlash`, `--max-model-len 200000`, `--max-num-seqs 16`, `--gpu-memory-utilization 0.85`. Single-stream, greedy (`temperature=0`), reasoning mode disabled for clean decode-rate measurement.
 
 #### Headline single-stream numbers
 
@@ -582,6 +582,6 @@ Apache 2.0, inherited from `Qwen/Qwen3.6-27B`.
 
 **Built over 72 hours · Hundreds of research agents · Lossless · Capability-enhanced**
 
-[BF16](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored) &nbsp;·&nbsp; [NVFP4](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4) &nbsp;·&nbsp; [Container](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored/pkgs/container/vllm-aeon-ultimate)
+[BF16](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored) &nbsp;·&nbsp; [NVFP4](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4) &nbsp;·&nbsp; [Container](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/pkgs/container/vllm-aeon-ultimate-dflash)
 
 </div>
