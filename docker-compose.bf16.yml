@@ -1,0 +1,50 @@
+# docker-compose.bf16.yml — Qwen3.6-27B-AEON-Ultimate-Uncensored BF16 on A100/H100
+#
+# For Ampere/Hopper cards. Uses vanilla vLLM (no patches needed for BF16).
+# Default profile is for 80 GB single-GPU at 131K context.
+#
+# For 96 GB cards (RTX PRO 6000 Blackwell on the BF16 path) raise to:
+#   --max-num-seqs 32
+#   --max-num-batched-tokens 16384
+#   --max-model-len 262144
+#
+# Pull weights first:
+#   hf download AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored \
+#     --local-dir /opt/models/aeon-ultimate-bf16
+#
+# Then:
+#   docker compose -f docker-compose.bf16.yml up -d
+
+services:
+  aeon-ultimate-bf16:
+    image: vllm/vllm-openai:latest
+    container_name: aeon-ultimate-bf16
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+    volumes:
+      - /opt/models/aeon-ultimate-bf16:/models/aeon-ultimate:ro
+    command: >
+      --model /models/aeon-ultimate
+      --served-model-name aeon-ultimate
+      --host 0.0.0.0 --port 8000
+      --dtype bfloat16
+      --max-model-len 131072
+      --max-num-seqs 16
+      --max-num-batched-tokens 8192
+      --gpu-memory-utilization 0.90
+      --enable-chunked-prefill
+      --enable-auto-tool-choice
+      --tool-call-parser qwen3_coder
+      --reasoning-parser qwen3
+      --attention-backend flash_attn
+      --trust-remote-code
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s

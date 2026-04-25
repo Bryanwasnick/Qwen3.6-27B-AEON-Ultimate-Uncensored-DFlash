@@ -1,0 +1,60 @@
+# docker-compose.yml — Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4 on DGX Spark
+#
+# Recommended deployment for Blackwell-class hardware (DGX Spark / GB10 / sm_121a,
+# B100/B200, RTX PRO 6000 Blackwell). Uses the production-stable patched vLLM
+# image with sm_121a CUTLASS NVFP4 kernels.
+#
+# Pull weights first:
+#   hf download AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4 \
+#     --local-dir /opt/models/aeon-ultimate-nvfp4
+#
+# Then:
+#   docker compose up -d
+#   docker compose logs -f aeon-ultimate
+
+services:
+  aeon-ultimate:
+    image: ghcr.io/aeon-7/vllm-spark-omni-q36:v1.2
+    container_name: aeon-ultimate
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    runtime: nvidia
+    environment:
+      # sm_120 baseline + PTX for sm_121a forward-compat
+      TORCH_CUDA_ARCH_LIST: "12.0+PTX"
+      # Reduce fragmentation under long-context KV churn
+      PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True"
+      # Force patched CUTLASS NVFP4 path; FlashInfer's MoE FP4 has known
+      # correctness issues on sm_121a as of this image
+      VLLM_USE_FLASHINFER_MOE_FP4: "0"
+      NVIDIA_VISIBLE_DEVICES: all
+    volumes:
+      - /opt/models/aeon-ultimate-nvfp4:/models/aeon-ultimate:ro
+    command: >
+      vllm serve /models/aeon-ultimate
+      --served-model-name aeon-ultimate
+      --host 0.0.0.0 --port 8000
+      --tensor-parallel-size 1
+      --dtype auto
+      --quantization compressed-tensors
+      --max-model-len 262144
+      --max-num-seqs 64
+      --max-num-batched-tokens 16384
+      --gpu-memory-utilization 0.85
+      --enable-chunked-prefill
+      --no-enable-prefix-caching
+      --load-format safetensors
+      --trust-remote-code
+      --enable-auto-tool-choice
+      --tool-call-parser qwen3_coder
+      --reasoning-parser qwen3
+      --attention-backend flash_attn
+      --mm-encoder-tp-mode data
+      --mm-processor-cache-type shm
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
