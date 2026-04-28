@@ -461,7 +461,7 @@ That runs [`docker-compose.yml`](docker-compose.yml) which is the single source 
 - This file's section that matches your symptom
 - [`docker-compose.yml`](docker-compose.yml) inline comments
 - The [HF model card for the NVFP4 release](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4) — quantization details
-- The [HF model card for BF16](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored) — abliteration pipeline details
+- The [HF model card for BF16](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16) — abliteration pipeline details
 - The user — for anything that requires architectural decisions, hardware changes, or visible side effects
 
 **Do not invent fixes from training data.** This stack is recent and your training data probably doesn't contain it. When in doubt, report what you observe and stop.
