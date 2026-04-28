@@ -24,9 +24,13 @@ Two release formats:
 | Release | Size | Target hardware | Use when |
 |---|---|---|---|
 | **[BF16](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16)** | 51 GB | A100 / H100 80 GB · RTX PRO 6000 Blackwell 96 GB | You have an Ampere/Hopper card or want full-precision reference weights |
-| **[NVFP4](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4)** | 26 GB | DGX Spark (GB10) · B100/B200 · RTX PRO 6000 Blackwell | You have Blackwell-or-later silicon — **recommended for any new deployment** |
+| **[NVFP4](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4)** *(DFlash spec decode)* | 26 GB | DGX Spark (GB10 / sm_121a) | **Production-validated for DGX Spark.** llm-compressor format, `--quantization compressed-tensors`, DFlash drafter k=15 |
+| **[Multimodal-NVFP4-MTP](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Multimodal-NVFP4-MTP)** *(experimental)* | 27 GB | RTX PRO 6000 Blackwell · B100/B200 | modelopt format, `--quantization modelopt`, MTP spec decode via grafted `mtp.*` head. Vision tower preserved. **In validation.** |
+| **[Text-NVFP4-MTP](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Text-NVFP4-MTP)** *(experimental)* | 26 GB | RTX 5090 (32 GB) · RTX PRO 6000 text-only | Same recipe as Multimodal-NVFP4-MTP, vision tower stripped. **In validation.** |
 
-Both formats are **the same model**. NVFP4 KL divergence vs BF16 source is below the noise floor of stochastic sampling — you cannot tell them apart at the output level.
+All four formats are **the same underlying model**. NVFP4 KL divergence vs BF16 source is below the noise floor of stochastic sampling — you cannot tell them apart at the output level. The two MTP variants share the same NVFP4 quantization quality plus the original `Qwen/Qwen3.6-27B` MTP head grafted back in BF16 (bit-exact, verified) for spec-decode drafting.
+
+> **MTP variants are in testing / validation stage** as of release. vLLM serve under `--quantization modelopt` is confirmed working and MTP spec-decode fires correctly. End-to-end performance benchmarks on RTX 5090, RTX PRO 6000, and DGX Spark are in progress — they're expected to outperform the DFlash variant on **dedicated-VRAM Blackwell GPUs** (RTX 5090, RTX PRO 6000) due to MTP's higher acceptance length, while DFlash is expected to remain the better fit for DGX Spark's unified memory. Current measured numbers (DGX Spark + DFlash) live in the [Performance section](#performance) below; the MTP numbers will land there once measured.
 
 ---
 
