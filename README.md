@@ -470,32 +470,44 @@ Wielding an uncensored model is genuinely different from wielding an aligned one
 
 Production config: `ghcr.io/aeon-7/vllm-aeon-ultimate-dflash:qwen36-v2.1`, DFlash spec-decode k=15 via `z-lab/Qwen3.6-27B-DFlash`, async scheduling enabled, `--max-model-len 200000`, `--max-num-seqs 16`, `--gpu-memory-utilization 0.85`. **Single-stream, greedy** (`temperature=0`), no concurrent serving load. Both bench scripts ([`bench/bench_aeon.py`](bench/bench_aeon.py), [`bench/bench_aeon_thinking.py`](bench/bench_aeon_thinking.py)) ship in this repo so you can run them yourself to verify on your hardware.
 
-#### Headline single-stream numbers
+#### Three configurations measured on Spark — pick the best for your use
 
-Two configurations, both useful:
+| Configuration | Body | Drafter / spec method | Median | Peak | TTFT | Aggregate |
+|---|---|---|---|---|---|---|
+| **🏆 XS body + new DFlash** *(2026-04-28 winner — recommended)* | `-Multimodal-NVFP4-MTP-XS` *(modelopt)* | `z-lab/Qwen3.6-27B-DFlash` v2 (2026-04-27 push), DFlash *k=15* | **37.6 tok/s** | **68.7 tok/s** *(Code Python)* | **266 ms** | 25.9 tok/s |
+| Regular NVFP4 + old DFlash *(prior production)* | `-NVFP4` *(compressed-tensors)* | `z-lab/Qwen3.6-27B-DFlash` v1 (2026-04-25), DFlash *k=15* | 32.5 tok/s | 56.7 tok/s | 325 ms | 21.0 tok/s |
+| XS body + MTP *(spec-method ablation)* | `-Multimodal-NVFP4-MTP-XS` *(modelopt)* | grafted MTP head, qwen3_5_mtp *n=3* | 24.1 tok/s | 27.5 tok/s | 298 ms | 20.7 tok/s |
 
-| Metric | **Thinking OFF** *(headline; clean decode-rate measurement)* | **Thinking ON** *(default user-facing path)* |
+**Two changes lifted the headline ~+15 % median, ~+21 % peak**:
+1. **DFlash drafter v2** (z-lab pushed an updated drafter on 2026-04-27 — different weights, same 3.46 GB size) — measurable lift on its own, mean accepted length per round 2.60 (vs 2.0–2.3 on the old drafter).
+2. **XS body via modelopt** instead of the regular compressed-tensors NVFP4 — the `linear_attn` projections at NVFP4 share the same dispatch path as the rest of the body (one fewer BF16↔FP4 cast per layer per token), and the smaller in-memory footprint frees Spark unified-memory bandwidth for KV/spec-decode work.
+
+The MTP-XS row confirms the routing call: **MTP underperforms on Spark even with the same XS body** — the bandwidth limitation we identified earlier holds. DFlash is decisively the right spec method for unified-memory hardware.
+
+#### Headline single-stream numbers (winning config)
+
+| Metric | **Thinking OFF** *(headline)* | **Thinking ON** *(user-facing path)* |
 |---|---|---|
-| Peak decode rate | **56.7 tok/s** (Code Python) | **46.1 tok/s** (Reasoning) |
-| Median decode rate | **32.5 tok/s** | **28.3 tok/s** |
-| Min decode rate | 14.7 tok/s (Decode 256) | 19.1 tok/s (Long-form) |
-| Median TTFT | 325 ms | 329 ms (effectively the same) |
-| Aggregate over 11-prompt suite | 2,869 tok / 136.6 s = 21.0 tok/s | 3,768 tok / 155.1 s = 24.3 tok/s |
+| Peak decode rate | **68.7 tok/s** (Code Python) | **56.7 tok/s** (Reasoning) |
+| Median decode rate | **37.6 tok/s** | **32.6 tok/s** |
+| Min decode rate | 18.0 tok/s (Decode 256) | 25.0 tok/s (Decode 512) |
+| Median TTFT | 266 ms | 245 ms |
+| Aggregate over 11-prompt suite | 3,282 tok / 127.0 s = 25.9 tok/s | 3,768 tok / 120.9 s = 31.2 tok/s |
 
 Thinking-on lifts aggregate throughput (more tokens generated in similar wall-clock) because the model spends compute on reasoning tokens at roughly the same decode rate as content tokens. Thinking-on lowers per-prompt decode rate by ~13 % median because reasoning content has lower DFlash acceptance than the structured final-answer formats.
 
-#### By prompt class (thinking OFF — headline)
+#### By prompt class — winning config (XS body + new DFlash, thinking OFF)
 
 | Class | Median tok/s | Peak tok/s | Notes |
 |---|---|---|---|
-| **Math** (arithmetic, calculus, word problems) | 41.9 | **51.7** | Best median; short, structured, high DFlash acceptance |
-| **Reasoning** (transitive syllogism) | 39.2 | 39.2 | n=1 |
-| **Code** (Python, Rust, SQL) | 36.0 | **56.7** | Peak — Code Python with architecture-matched DFlash drafter |
-| Long-form (ZKP exposition) | 20.6 | 20.6 | n=1 |
-| Security research (SQLi PoCs) | 18.7 | 18.7 | n=1; complied with research framing |
-| Pure decode (256 / 512 tok essays) | 14.7 | 14.7 | Lower DFlash acceptance on free-form prose |
+| **Code** (Python, Rust, SQL) | 57.2 | **68.7** | Peak — Code Python; new drafter aligns better with code distribution |
+| **Reasoning** (transitive syllogism) | 45.7 | 45.7 | n=1 |
+| **Math** (arithmetic, calculus, word problems) | 44.5 | 47.3 | Short, structured, high DFlash acceptance |
+| Long-form (ZKP exposition) | 23.7 | 23.7 | n=1 |
+| Security research (SQLi PoCs) | 23.3 | 23.3 | n=1; complied with research framing |
+| Pure decode (256 / 512 tok essays) | 18.3 | 18.6 | Lower DFlash acceptance on free-form prose |
 
-> **Peak — 56.7 tok/s** on Code Python with thinking OFF. DFlash acceptance is near-perfect on highly-structured outputs (math problems following "define vars → setup → solve", code following idiomatic syntax patterns) that match the drafter's training distribution. This is the upper-bound rate this stack delivers when the workload aligns with spec-decode strengths.
+> **Peak — 68.7 tok/s** on Code Python with thinking OFF (vs prior production's 56.7). The new DFlash drafter v2 lifts every category, with the largest gains on Code and Reasoning where the drafter's training distribution overlaps well with the prompts. Mean accepted length per round: 2.60 (vs 2.0–2.3 on the prior drafter).
 
 #### Benchmark methodology
 
