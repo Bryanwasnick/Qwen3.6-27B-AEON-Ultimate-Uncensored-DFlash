@@ -9,7 +9,7 @@
 #   --max-model-len 262144
 #
 # Pull weights first:
-#   hf download AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored \
+#   hf download AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16 \
 #     --local-dir /opt/models/aeon-ultimate-bf16
 #
 # Then:

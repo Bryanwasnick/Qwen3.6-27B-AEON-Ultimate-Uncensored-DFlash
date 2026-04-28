@@ -177,7 +177,7 @@ For Ampere / Hopper cards, run the BF16 release on vanilla vLLM.
 ### Step 1 — Pull weights
 
 ```bash
-hf download AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored \
+hf download AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16 \
   --local-dir /opt/models/aeon-ultimate-bf16
 ```
 
@@ -557,7 +557,7 @@ Production config: `ghcr.io/aeon-7/vllm-aeon-ultimate-dflash:qwen36-v2.1`, DFlas
 
 ## Responsibility, arbitration, and use
 
-This is an uncensored model. Read the [model card's User Responsibility & Arbitration Clause](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored#user-responsibility--arbitration-clause) before deploying. Summary:
+This is an uncensored model. Read the [model card's User Responsibility & Arbitration Clause](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16#user-responsibility--arbitration-clause) before deploying. Summary:
 
 - You are solely responsible for prompts, outputs, and downstream actions.
 - Provided "AS IS" — no warranty of any kind.
