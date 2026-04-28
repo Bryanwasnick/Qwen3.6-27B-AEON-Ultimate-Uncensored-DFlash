@@ -122,15 +122,19 @@ The empirically observed "capability damage threshold" in the abliteration liter
 
 ## Hardware compatibility matrix
 
-| Hardware | Recommended release | Notes |
-|---|---|---|
-| **DGX Spark (GB10, sm_121a)** | **NVFP4** | Native FP4 tensor cores. Use the [`vllm-aeon-ultimate-dflash:qwen36-v2.1`](https://github.com/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/pkgs/container/vllm-aeon-ultimate-dflash) container — production-tuned for this exact model + DFlash spec decode. |
-| **B100 / B200 (sm_100)** | **NVFP4** | Native FP4 via `tcgen05` / UTCQMMA — fastest hardware for this format. |
-| **RTX PRO 6000 Blackwell (sm_120)** | **NVFP4** | Native FP4 via CUTLASS path. Excellent throughput. |
-| **H100 80 GB (sm_90)** | **BF16** | NVFP4 dequants to BF16 at kernel level — works but no throughput gain. Use BF16 for cleaner code path. |
-| **A100 80 GB (sm_80)** | **BF16** | Same as H100. BF16 at 131K context, single-GPU. |
-| **RTX PRO 6000 Blackwell 96 GB (BF16 path)** | **BF16** | If you want full 262K context without quantization. |
-| **Anything older than A100** | Not supported | 51 GB BF16 or 26 GB NVFP4 will not fit + lacks attention backends. |
+The right variant depends on **memory architecture**, not just GPU model. Routing below is **measured**, not theoretical — see the [Performance section](#performance) for the head-to-head bench data.
+
+| Hardware | Recommended variant | Why this exact variant | Spec-decode method |
+|---|---|---|---|
+| **DGX Spark / GB10** *(sm_121a, unified memory)* | **[`-NVFP4` (DFlash)](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-NVFP4)** | Bench: DFlash beats MTP **+26 % median, +52 % peak** here. Spark's unified-memory bandwidth doesn't reward MTP's high acceptance — DFlash's k=15 chains pull more verified tokens per round. **Don't run MTP on Spark.** | DFlash *k=15* via [`z-lab/Qwen3.6-27B-DFlash`](https://huggingface.co/z-lab/Qwen3.6-27B-DFlash) drafter |
+| **B100 / B200** *(sm_100, dedicated FP4 silicon)* | **[`-Multimodal-NVFP4-MTP`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Multimodal-NVFP4-MTP)** (preferred — GDN BF16 fits) or [Text variant](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Text-NVFP4-MTP) | Native FP4 via `tcgen05` / UTCQMMA — fastest hardware for this format. Dedicated VRAM bandwidth lets MTP's high acceptance rate translate to throughput. | qwen3_5_mtp *n=3* (head grafted bf16, in repo) |
+| **RTX PRO 6000 Blackwell** *(sm_120, 96 GB dedicated)* | **[`-Multimodal-NVFP4-MTP`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Multimodal-NVFP4-MTP)** for vision · [`-Text-NVFP4-MTP`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Text-NVFP4-MTP) for text-only · [XS siblings](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Multimodal-NVFP4-MTP-XS) for ~10 % faster decode | Measured 92–111 tok/s median on this card with MTP. XS hits 111.4 tok/s median, peak 124.7 — beats the regular variant by ~10 %. | qwen3_5_mtp *n=3* |
+| **RTX 5090** *(sm_120, 32 GB dedicated)* | **[`-Multimodal-NVFP4-MTP-XS`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Multimodal-NVFP4-MTP-XS)** *(21 GB)* if you use vision · **[`-Text-NVFP4-MTP-XS`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Text-NVFP4-MTP-XS)** *(20 GB)* if text-only | Regular MTP variants (~27 GB) leave too little KV headroom on 32 GB. XS variants (conv1d preserved BF16, projection matmuls FP4) fit comfortably. | qwen3_5_mtp *n=3* |
+| **Other 24 GB cards** *(RTX 4090, RTX 3090, RTX A6000 ≤48 GB)* | **[`-Text-NVFP4-MTP-XS`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-Text-NVFP4-MTP-XS)** *(20 GB)* | The smallest variant. Pre-Blackwell sm_<120 will dequantize NVFP4 → BF16 at the kernel level (no FP4 silicon win), but the model still works and KV fits. | qwen3_5_mtp *n=3* |
+| **H100 80 GB** *(sm_90)* | **[`-BF16`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16)** | NVFP4 dequants to BF16 at kernel level — works but no throughput gain. Use BF16 for cleaner code path. | none (or external EAGLE / Medusa drafter) |
+| **A100 80 GB** *(sm_80)* | **[`-BF16`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16)** | Same as H100. BF16 at 131K context, single-GPU. | none |
+| **Multi-GPU (any tier)** | **[`-BF16`](https://huggingface.co/AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16)** *(`tensor-parallel-size 2/4/8`)* | Reference weights for fine-tuning, distillation, or quant-recipe development. | none |
+| **Anything older than A100** | Not supported | Won't fit + lacks attention backends. |
 
 ---
 
